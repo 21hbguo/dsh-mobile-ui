@@ -89,10 +89,11 @@ export function apply(ctx: ClientContext, config: MobileUiSettings = {}): void {
   let lastBreakpoint = -1
   const syncEngine = (): void => {
     if (enabled() && engine === undefined) {
-      engine = new MobileUiEngine(ctx, breakpoint)
+      const eng = new MobileUiEngine(ctx, breakpoint)
+      engine = eng
       ctx.effect(() => {
-        engine!.mount()
-        return () => engine!.dispose()
+        eng.mount()
+        return () => eng.dispose() // 捕获实例：fiber 拆除时不受 engine 变量后续变化影响
       }, 'mobile-ui: engine')
       lastBreakpoint = breakpoint()
     } else if (engine !== undefined) {
