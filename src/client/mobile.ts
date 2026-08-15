@@ -230,6 +230,7 @@ const ICONS = {
   panel: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M10.5 2.5v11"/></svg>',
   expand: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>',
   compress: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2v4H2M10 2v4h4M6 14v-4H2M10 14v-4h4"/></svg>',
+  refresh: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9"/><path d="M13.5 2v2.8h-2.8"/></svg>',
 } as const
 
 /**
@@ -392,7 +393,7 @@ export class MobileUiEngine {
     bar.id = BAR_ID
     bar.className = 'dsh-mobile-bar'
     bar.setAttribute('data-dsh-mobile-bar', '')
-    const btn = (action: 'sidebar' | 'panel' | 'fullscreen', icon: string, label: string): HTMLButtonElement => {
+    const btn = (action: 'sidebar' | 'panel' | 'refresh' | 'fullscreen', icon: string, label: string): HTMLButtonElement => {
       const el = document.createElement('button')
       el.type = 'button'
       el.className = 'dsh-mobile-bar-btn'
@@ -407,8 +408,9 @@ export class MobileUiEngine {
     }
     const sidebarBtn = btn('sidebar', ICONS.menu, '打开侧栏')
     const panelBtn = btn('panel', ICONS.panel, '打开右侧面板')
+    const refreshBtn = btn('refresh', ICONS.refresh, '刷新页面')
     const fullscreenBtn = btn('fullscreen', ICONS.expand, '全屏')
-    bar.append(sidebarBtn, panelBtn, fullscreenBtn)
+    bar.append(sidebarBtn, panelBtn, refreshBtn, fullscreenBtn)
     document.body.appendChild(bar)
     this.barEl = bar
 
@@ -607,13 +609,17 @@ export class MobileUiEngine {
 
   // ---------- interactions ----------
 
-  private onBarAction(action: 'sidebar' | 'panel' | 'fullscreen'): void {
+  private onBarAction(action: 'sidebar' | 'panel' | 'refresh' | 'fullscreen'): void {
     if (action === 'sidebar') {
       try { this.ctx.layout?.toggleSidebar() } catch (error) { console.warn('[mobile-ui] toggle sidebar failed', error) }
       return
     }
     if (action === 'panel') {
       this.toggleRightPanel()
+      return
+    }
+    if (action === 'refresh') {
+      location.reload()
       return
     }
     this.toggleFullscreen()
