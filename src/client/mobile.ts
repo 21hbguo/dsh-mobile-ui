@@ -264,6 +264,18 @@ export class MobileUiEngine {
   private suppressOpen = false
   /** Timestamp of the first consecutive all-closed observation (zero-streak). */
   private zeroStreakAt = 0
+
+  // ---------- 返回键拦截（全屏 / PWA standalone 内「返回退栈」） ----------
+  /** History trap pushed; a back press pops it and reaches onPopstate. */
+  private trapArmed = false
+  /** Set when we pop the trap ourselves (disarm); skip the resulting popstate. */
+  private ignoreNextPop = false
+  /** True while WE initiated a fullscreen exit (⛶ / 空栈返回 / dispose). */
+  private intentionalExit = false
+  /** Debounced fullscreen re-entry timer (Android back exits fullscreen first). */
+  private reenterTimer: number | undefined = undefined
+  private lastReenterAt = 0
+  private popstateListener: (() => void) | null = null
   /** Grace timestamp: settle "no aionui" after this many ms without a 5-track template. */
   private autoCloseGraceUntil = 0
   /** Deadline for the pending-chevron retry loop (reset per activation). */
@@ -324,6 +336,14 @@ export class MobileUiEngine {
         document.removeEventListener('fullscreenchange', this.fullscreenListener)
         this.fullscreenListener = null
       }
+      if (this.popstateListener !== null) {
+        window.removeEventListener('popstate', this.popstateListener)
+        this.popstateListener = null
+      }
+      if (this.reenterTimer !== undefined) { clearTimeout(this.reenterTimer); this.reenterTimer = undefined }
+      this.disarmTrap()
+      this.intentionalExit = false
+      this.ignoreNextPop = false
       this.sessionsOff?.(); this.sessionsOff = null
       this.restoreViewport()
     } catch (error) {
@@ -395,8 +415,14 @@ export class MobileUiEngine {
     this.fullscreenListener = (): void => {
       fullscreenBtn.innerHTML = document.fullscreenElement === null ? ICONS.expand : ICONS.compress
       fullscreenBtn.setAttribute('aria-label', document.fullscreenElement === null ? '全屏' : '退出全屏')
+      this.onFullscreenChange()
     }
     document.addEventListener('fullscreenchange', this.fullscreenListener)
+    // 返回键拦截：popstate = 浏览器/系统返回键弹出我们的 history 陷阱
+    this.popstateListener = (): void => { this.onPopstate() }
+    window.addEventListener('popstate', this.popstateListener)
+    // 已以 standalone（添加到主屏幕）方式运行 → 直接启用返回退栈
+    if (this.isStandalone()) this.armTrap()
   }
 
   // ---------- breakpoint / activation ----------
@@ -431,6 +457,9 @@ export class MobileUiEngine {
       this.restoreViewport()
       this.suppressOpen = false
       if (this.retryTimer !== undefined) { clearTimeout(this.retryTimer); this.retryTimer = undefined }
+      if (this.reenterTimer !== undefined) { clearTimeout(this.reenterTimer); this.reenterTimer = undefined }
+      this.disarmTrap()
+      this.intentionalExit = false
       this.frame?.classList.remove('dsh-mobile-explorer-open', 'dsh-mobile-preview-open')
     }
   }
@@ -616,6 +645,7 @@ export class MobileUiEngine {
 
   private toggleFullscreen(): void {
     if (document.fullscreenElement !== null) {
+      this.intentionalExit = true // ⛶ 主动退出：不触发返回拦截的重进逻辑
       void document.exitFullscreen().catch(() => { /* ignore */ })
       return
     }
@@ -627,6 +657,132 @@ export class MobileUiEngine {
     }
     // iOS Safari 无 Fullscreen API → 提示添加到主屏幕
     this.showToast('建议：浏览器菜单 →「添加到主屏幕」，即可全屏使用')
+  }
+
+  // ---------- 返回键退栈 ----------
+
+  /** 返回键只在「移动布局 +（全屏 或 PWA standalone）」时被拦截。 */
+  private backEnabled(): boolean {
+    return this.active && (document.fullscreenElement !== null || this.isStandalone())
+  }
+
+  private isStandalone(): boolean {
+    try {
+      return window.matchMedia('(display-mode: standalone)').matches
+        || (window.navigator as unknown as { standalone?: boolean }).standalone === true
+    } catch { return false }
+  }
+
+  /** Push the history trap so a back press reaches onPopstate. */
+  private armTrap(): void {
+    if (this.trapArmed) return
+    try {
+      history.pushState({ dshMobileTrap: true }, '')
+      this.trapArmed = true
+    } catch { /* 环境禁止 pushState（如部分 WebView）→ 不拦截 */ }
+  }
+
+  /** Pop our own trap; the resulting popstate is ignored. */
+  private disarmTrap(): void {
+    if (!this.trapArmed) return
+    this.trapArmed = false
+    this.ignoreNextPop = true
+    try { history.back() } catch { /* ignore */ }
+  }
+
+  /** 一次返回被消费（关了层）：重新布陷阱。 */
+  private reArmTrap(): void {
+    this.trapArmed = false // 本次 popstate 已弹掉旧陷阱
+    this.armTrap()
+  }
+
+  /** 关闭当前最顶层可关层（返回退栈语义）。返回是否消费了这次返回。 */
+  private closeTopLayer(): boolean {
+    const frame = this.frame
+    if (frame === null) return false
+    // 1. aionui 对话框（未哈希类名，点遮罩/Esc 即关）
+    const aionuiOverlay = [...document.querySelectorAll('.aionui-overlay')].find(el => {
+      const cs = getComputedStyle(el)
+      return cs.display !== 'none' && cs.visibility !== 'hidden' && el.getBoundingClientRect().width > 0
+    })
+    if (aionuiOverlay !== undefined) {
+      ;(aionuiOverlay as HTMLElement).click()
+      return true
+    }
+    // 2. 模态对话框（设置页等 role=dialog aria-modal）：派发 Escape
+    const modal = document.querySelector('[role="dialog"][aria-modal="true"]')
+    if (modal !== null) {
+      const closeBtn = modal.querySelector<HTMLElement>('button[aria-label*="close" i], button[aria-label*="关闭"]')
+      closeBtn?.click()
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      return true
+    }
+    // 3. 侧栏抽屉
+    if (!frame.hasAttribute('data-sidebar-collapsed')) {
+      try { this.ctx.layout?.toggleSidebar() } catch { /* ignore */ }
+      return true
+    }
+    // 4. 右侧面板（详情列 / aionui 资源列·预览列）
+    if (!frame.hasAttribute('data-details-collapsed')) {
+      try { this.ctx.layout?.closeDetails() } catch { /* ignore */ }
+      return true
+    }
+    if (frame.classList.contains('dsh-mobile-explorer-open') || frame.classList.contains('dsh-mobile-preview-open')) {
+      this.toggleRightPanel()
+      return true
+    }
+    return false
+  }
+
+  /** popstate：系统返回键弹出了我们的陷阱。 */
+  private onPopstate(): void {
+    if (this.ignoreNextPop) { this.ignoreNextPop = false; return }
+    if (!this.backEnabled()) return
+    if (this.closeTopLayer()) { this.reArmTrap(); return }
+    if (document.fullscreenElement !== null) {
+      // 空栈 → 有意退出全屏（再按返回才是离开页面）
+      this.intentionalExit = true
+      this.trapArmed = false // 本次 popstate 已弹掉陷阱
+      void document.exitFullscreen().catch(() => { /* ignore */ })
+      return
+    }
+    // 空栈且非全屏（standalone）→ 放行：浏览器继续（通常为关闭应用）
+    this.trapArmed = false
+  }
+
+  /** fullscreenchange：进入 → 布陷阱；退出 → 区分主动/外部。 */
+  private onFullscreenChange(): void {
+    if (document.fullscreenElement !== null) {
+      this.intentionalExit = false
+      this.armTrap()
+      return
+    }
+    if (this.intentionalExit) {
+      this.intentionalExit = false
+      this.disarmTrap()
+      return
+    }
+    // 外部退出：Android 返回键 / Esc。返回键语义 = 关闭当前层并保持全屏。
+    if (this.closeTopLayer()) {
+      if (window.matchMedia('(pointer: coarse)').matches) this.scheduleReenter()
+      return
+    }
+    // 无层可关 → 视为有意退出
+    this.disarmTrap()
+  }
+
+  /** 防抖重进全屏（Android 返回键会先退出全屏，随后我们要恢复它）。 */
+  private scheduleReenter(): void {
+    const now = Date.now()
+    if (now - this.lastReenterAt < 1500) return
+    this.lastReenterAt = now
+    if (this.reenterTimer !== undefined) clearTimeout(this.reenterTimer)
+    this.reenterTimer = window.setTimeout(() => {
+      this.reenterTimer = undefined
+      if (document.fullscreenElement === null) {
+        void document.documentElement.requestFullscreen().catch(() => { /* ignore */ })
+      }
+    }, 80)
   }
 
   private onBackdropClick(): void {
