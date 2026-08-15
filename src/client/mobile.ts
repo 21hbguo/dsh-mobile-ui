@@ -277,6 +277,14 @@ export class MobileUiEngine {
   private reenterTimer: number | undefined = undefined
   private lastReenterAt = 0
   private popstateListener: (() => void) | null = null
+
+  // ---------- 会话切换抑制键盘（自动聚焦拦截） ----------
+  /** 到此时间戳之前，composer 的自动聚焦会被 blur 掉（键盘不弹出）。 */
+  private suppressFocusUntil = 0
+  /** 用户最后一次直接点在 composer 输入区的时间戳（手动聚焦放行）。 */
+  private lastComposerTapAt = 0
+  private focusInListener: ((event: FocusEvent) => void) | null = null
+  private pointerDownListener: ((event: PointerEvent) => void) | null = null
   /** Grace timestamp: settle "no aionui" after this many ms without a 5-track template. */
   private autoCloseGraceUntil = 0
   /** Deadline for the pending-chevron retry loop (reset per activation). */
@@ -345,6 +353,14 @@ export class MobileUiEngine {
       this.disarmTrap()
       this.intentionalExit = false
       this.ignoreNextPop = false
+      if (this.focusInListener !== null) {
+        document.removeEventListener('focusin', this.focusInListener)
+        this.focusInListener = null
+      }
+      if (this.pointerDownListener !== null) {
+        document.removeEventListener('pointerdown', this.pointerDownListener, true)
+        this.pointerDownListener = null
+      }
       this.sessionsOff?.(); this.sessionsOff = null
       this.restoreViewport()
     } catch (error) {
@@ -423,6 +439,16 @@ export class MobileUiEngine {
     // 返回键拦截：popstate = 浏览器/系统返回键弹出我们的 history 陷阱
     this.popstateListener = (): void => { this.onPopstate() }
     window.addEventListener('popstate', this.popstateListener)
+    // 会话切换后 composer 的自动聚焦会弹手机键盘；记录用户对输入区的点击
+    // 以便放行手动聚焦，拦截 React 的自动聚焦。
+    this.pointerDownListener = (event: PointerEvent): void => {
+      if (event.target instanceof Element && event.target.closest('[data-composer-seat]') !== null) {
+        this.lastComposerTapAt = Date.now()
+      }
+    }
+    document.addEventListener('pointerdown', this.pointerDownListener, true)
+    this.focusInListener = (event: FocusEvent): void => { this.onFocusIn(event) }
+    document.addEventListener('focusin', this.focusInListener)
     // 已以 standalone（添加到主屏幕）方式运行 → 直接启用返回退栈
     if (this.isStandalone()) this.armTrap()
   }
@@ -455,6 +481,8 @@ export class MobileUiEngine {
       this.zeroStreakAt = 0
       this.suppressOpen = true
       this.autoCloseAionui()
+      // 页面加载即恢复会话时同样别弹键盘
+      this.suppressComposerFocus()
     } else {
       this.restoreViewport()
       this.suppressOpen = false
@@ -808,6 +836,22 @@ export class MobileUiEngine {
     }
   }
 
+  /** focusin：会话切换后的自动聚焦 → blur 掉（键盘不弹）；手动点击放行。 */
+  private onFocusIn(event: FocusEvent): void {
+    if (!this.active) return
+    if (Date.now() > this.suppressFocusUntil) return
+    const target = event.target
+    if (!(target instanceof Element)) return
+    if (target.closest('[data-composer-seat]') === null) return
+    if (Date.now() - this.lastComposerTapAt < 500) return // 用户刚点了输入区 → 放行
+    ;(target as HTMLElement).blur()
+  }
+
+  /** 会话切换（或移动布局激活）后的短暂窗口内抑制 composer 自动聚焦。 */
+  private suppressComposerFocus(): void {
+    this.suppressFocusUntil = Date.now() + 1000
+  }
+
   private onSessionsChange(): void {
     try {
       const list = this.ctx.sessions?.list
@@ -818,6 +862,7 @@ export class MobileUiEngine {
       this.sessionsInitialized = true
       const changed = !first && current !== this.lastSessionId
       this.lastSessionId = current
+      if (changed) this.suppressComposerFocus() // 切会话：先别弹键盘，让用户滑动浏览
       if (!changed || !this.active || this.frame === null) return
       // 在侧栏里点了会话/新建会话 → 自动收起抽屉回到聊天
       if (!this.frame.hasAttribute('data-sidebar-collapsed')) {
