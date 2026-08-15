@@ -1,0 +1,66 @@
+{
+  "name": "@dsh-external/dsh-mobile-ui",
+  "version": "0.1.0",
+  "description": "手机端 UI 适配：窄屏下把 DSH Web GUI 重构为全屏聊天布局（侧栏/右侧面板改为抽屉，顶部悬浮操作条 + 全屏按钮），默认 ≤860px 生效",
+  "private": true,
+  "type": "module",
+  "main": "./lib/index.js",
+  "types": "./lib/types/index.d.ts",
+  "files": [
+    "lib",
+    "src",
+    "cordis.patch.yml"
+  ],
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./invariant": {
+      "types": "./lib/types/invariant.d.ts",
+      "default": "./lib/invariant.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "license": "BSD-3-Clause",
+  "peerDependencies": {
+    "@deepseek-ai/dsh-client-locale": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-client-runtime": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-client-ui-layout": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-client-ui-settings": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.0.1-rc <2",
+    "@deepseek-ai/dsh-settings": ">=0.0.1-rc <2",
+    "cordis": ">=4.0.0-rc <5",
+    "react": "^18.2.0",
+    "schemastery": "^3.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.0",
+    "tsdown": "^0.22.14",
+    "typescript": "^5.9.0"
+  },
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "build:client": "tsdown",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  }
+}
