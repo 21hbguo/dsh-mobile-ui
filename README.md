@@ -9,7 +9,7 @@
   点了会话/「新会话」都会自动收起。
 - **右侧面板 → 抽屉**：详情列与 aionui 的「资源列 / 预览列」都变为右侧抽屉
   （点顶部面板按钮或 aionui 自带浮出按钮打开，内部 chevron / 遮罩关闭）。
-- **顶部悬浮操作条**：☰ 侧栏 · 面板 · ⛶ 全屏（Fullscreen API；iOS 无此 API
+- **顶部悬浮操作条**：☰ 侧栏 · 面板 · ⟳ 刷新 · ⛶ 全屏（Fullscreen API；iOS 无此 API
   时提示「添加到主屏幕」全屏使用）。
 - **移动端细节**：`viewport-fit=cover` + 安全区适配（刘海/底部横条）、16px
   输入框字号防 iOS 聚焦缩放、双击缩放禁用、`apple-mobile-web-app-capable`
