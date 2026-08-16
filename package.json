@@ -3,6 +3,26 @@
   "version": "0.1.0",
   "description": "手机端 UI 适配：窄屏下把 DSH Web GUI 重构为全屏聊天布局（侧栏/右侧面板改为抽屉，顶部悬浮操作条 + 全屏按钮），默认 ≤860px 生效",
   "private": true,
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "cordis",
+    "deepseek-harness",
+    "mobile",
+    "responsive",
+    "pwa",
+    "fullscreen",
+    "web-ui"
+  ],
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/21hbguo/dsh-mobile-ui.git"
+  },
+  "homepage": "https://github.com/21hbguo/dsh-mobile-ui",
+  "bugs": {
+    "url": "https://github.com/21hbguo/dsh-mobile-ui/issues"
+  },
   "type": "module",
   "main": "./lib/index.js",
   "types": "./lib/types/index.d.ts",
@@ -37,6 +57,26 @@
     "cordis": ">=4.0.0-rc <5",
     "react": "^18.2.0",
     "schemastery": "^3.18.0"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-client-locale": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-runtime": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-layout": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-settings": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-slots": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-settings": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^22.20.0",
