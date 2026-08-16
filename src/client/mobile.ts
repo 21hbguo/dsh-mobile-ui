@@ -271,10 +271,13 @@ export class MobileUiEngine {
   private trapArmed = false
   /** Set when we pop the trap ourselves (disarm); skip the resulting popstate. */
   private ignoreNextPop = false
-  /** True while WE initiated a fullscreen exit (⛶ / 空栈返回 / dispose). */
+  /** True while WE initiated a fullscreen exit (⛶ 按钮 / dispose). */
   private intentionalExit = false
+  /** Last moment we were in fullscreen (covers the exit-transition window). */
+  private lastFullscreenAt = 0
   /** Debounced fullscreen re-entry timer (Android back exits fullscreen first). */
   private reenterTimer: number | undefined = undefined
+  /** Failure backoff: set when requestFullscreen rejects, to avoid retry loops. */
   private lastReenterAt = 0
   private popstateListener: (() => void) | null = null
 
@@ -768,16 +771,19 @@ export class MobileUiEngine {
     return false
   }
 
-  /** popstate：系统返回键弹出了我们的陷阱。 */
+  /** popstate：系统返回键弹出了我们的陷阱。全屏下任何返回都不允许退出全屏。 */
   private onPopstate(): void {
     if (this.ignoreNextPop) { this.ignoreNextPop = false; return }
     if (!this.backEnabled()) return
+    // 全屏刚退出的过渡期内（浏览器同时弹了历史）也按全屏处理
+    const inFullscreen = document.fullscreenElement !== null
+      || Date.now() - this.lastFullscreenAt < 2000
     if (this.closeTopLayer()) { this.reArmTrap(); return }
-    if (document.fullscreenElement !== null) {
-      // 空栈 → 有意退出全屏（再按返回才是离开页面）
-      this.intentionalExit = true
-      this.trapArmed = false // 本次 popstate 已弹掉陷阱
-      void document.exitFullscreen().catch(() => { /* ignore */ })
+    if (inFullscreen) {
+      // 全屏 + 空栈：吞掉这次返回，绝不退全屏（退出请用 ⛶ 按钮）
+      this.reArmTrap()
+      if (window.matchMedia('(pointer: coarse)').matches) this.scheduleReenter()
+      this.showToast('全屏模式：按右上角 ⛶ 按钮退出')
       return
     }
     // 空栈且非全屏（standalone）→ 放行：浏览器继续（通常为关闭应用）
@@ -788,6 +794,7 @@ export class MobileUiEngine {
   private onFullscreenChange(): void {
     if (document.fullscreenElement !== null) {
       this.intentionalExit = false
+      this.lastFullscreenAt = Date.now()
       this.armTrap()
       return
     }
@@ -796,26 +803,28 @@ export class MobileUiEngine {
       this.disarmTrap()
       return
     }
-    // 外部退出：Android 返回键 / Esc。返回键语义 = 关闭当前层并保持全屏。
-    if (this.closeTopLayer()) {
+    // 外部退出（Android 返回键 / Esc）：返回键语义 = 关当前层；只要在移动
+    // 布局全屏场景（粗指针设备），一律恢复全屏 —— 返回键永不退出全屏。
+    if (this.active) {
+      this.closeTopLayer()
       if (window.matchMedia('(pointer: coarse)').matches) this.scheduleReenter()
       return
     }
-    // 无层可关 → 视为有意退出
     this.disarmTrap()
   }
 
-  /** 防抖重进全屏（Android 返回键会先退出全屏，随后我们要恢复它）。 */
+  /** 重进全屏（Android 返回键会先退出全屏，随后我们要恢复它）。
+   *  无时间防抖：连按返回每次都会被吞掉并恢复全屏；只有 requestFullscreen
+   *  失败时才退避 2s，防止无限重试。 */
   private scheduleReenter(): void {
-    const now = Date.now()
-    if (now - this.lastReenterAt < 1500) return
-    this.lastReenterAt = now
+    if (Date.now() - this.lastReenterAt < 2000) return
     if (this.reenterTimer !== undefined) clearTimeout(this.reenterTimer)
     this.reenterTimer = window.setTimeout(() => {
       this.reenterTimer = undefined
-      if (document.fullscreenElement === null) {
-        void document.documentElement.requestFullscreen().catch(() => { /* ignore */ })
-      }
+      if (document.fullscreenElement !== null) return
+      void document.documentElement.requestFullscreen().catch(() => {
+        this.lastReenterAt = Date.now()
+      })
     }, 80)
   }
 
