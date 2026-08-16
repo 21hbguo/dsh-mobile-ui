@@ -6,6 +6,9 @@
 [![Version](https://img.shields.io/badge/version-0.1.0-orange)](package.json)
 [![Platform](https://img.shields.io/badge/platform-web%20%2F%20cordis-8A2BE2)](package.json)
 
+![窄屏全屏聊天布局](docs/screenshots/mobile-ui-narrow.png)
+![侧栏抽屉](docs/screenshots/mobile-ui-drawer.png)
+
 ## ✨ 功能特性
 
 - 📱 **全屏聊天布局**：三栏 + 右侧面板列脱离文档流，聊天区占满整屏。
