@@ -1,6 +1,6 @@
 /**
- * Sysmon settings card: a disclosure card binding the `sysmon` settings
- * namespace — the enabled master switch and the collector cache interval.
+ * Mobile-ui settings card: a disclosure card binding the `mobile-ui` settings
+ * namespace — the enabled master switch and the breakpoint width.
  * All styles are inline (matching the widget's zero-dependency philosophy) so
  * the client bundle needs no css pipeline.
  */

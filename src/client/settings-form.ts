@@ -1,7 +1,7 @@
 /**
- * Staged form model behind the sysmon settings card — a self-contained slice
- * of the official plugin-config card-store pattern (same shape as the
- * dsh-web-ui family plugins use), so this package needs no sibling UI deps.
+ * Staged form model behind the mobile-ui settings card — a self-contained slice
+ * of the plugin-config card-store pattern (same shape as sibling UI plugins
+ * use), so this package needs no sibling UI deps.
  */
 
 import type { SettingsScope, SettingsScopeSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'

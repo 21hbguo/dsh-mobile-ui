@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build dsh-sysmon: compile src/ → lib/ with the dsh checkout's tsc, then
+# Build dsh-mobile-ui: compile src/ → lib/ with the dsh checkout's tsc, then
 # bundle the browser half with tsdown (lib/client.js).
 # Requires DSH_CHECKOUT pointing at a dsh source checkout (auto-probe below).
 set -euo pipefail
@@ -10,7 +10,7 @@ cd "$ROOT"
 # DSH_CHECKOUT 探测：环境变量 → 常见路径
 CHECKOUT="${DSH_CHECKOUT:-}"
 if [ -z "$CHECKOUT" ]; then
-  for candidate in "$HOME/dsh-harness" "$HOME/dsh" "$HOME/.dsh/dsh-harness" "~/project/other/deepseek-harness"; do
+  for candidate in "$HOME/dsh-harness" "$HOME/dsh" "$HOME/.dsh/dsh-harness" "$HOME/project/other/deepseek-harness"; do
     if [ -d "$candidate/packages" ]; then CHECKOUT="$candidate"; break; fi
   done
 fi

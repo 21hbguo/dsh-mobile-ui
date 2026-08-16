@@ -18,7 +18,7 @@
  *     添加到主屏幕）。
  *  6. 视口 meta 改写（viewport-fit=cover、禁双击缩放）+ PWA 全屏 meta。
  *
- * 失败策略与 dsh-sysmon 一致：DOM 问题只记日志不抛错，绝不拖垮 web boot。
+ * 失败策略：DOM 问题只记日志不抛错，绝不拖垮 web boot。
  * @module @dsh-external/dsh-mobile-ui/client
  */
 
